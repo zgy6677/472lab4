@@ -17,27 +17,26 @@ const map = new mapboxgl.Map({
     zoom: 12 // starting zoom level
 });
 
-
-
 /*--------------------------------------------------------------------
 Step 2: VIEW GEOJSON POINT DATA ON MAP
 --------------------------------------------------------------------*/
 //HINT: Create an empty variable
 //      Use the fetch method to access the GeoJSON from your online repository
 //      Convert the response to JSON format and then store the response in your new variable
-
-let newgeojson;
-
-fetch('https://raw.githubusercontent.com/zgy6677/472lab4/main/lab4/pedcyc_collision_06-21.geojson?token=GHSAT0AAAAAAB73XHSDMK2JEAC64ADTYU2OZA3OHSQ')
+let collisgeojson;
+fetch('https://raw.githubusercontent.com/zgy6677/472lab4/main/pedcyc_collision_06-21.geojson')
     .then(response => response.json())
     .then(response => {
-        console.log(response);
-        newgeojson = response;
+        collisgeojson = response;
+        // console.log(collisgeojson)    // check if fetch works
     });
+    
+    map.on('load', () => {
 
-
-
-
+        map.addSource('pedcyc-collis', { 
+            type: 'geojson',
+            data: collisgeojson    
+        });
 
 /*--------------------------------------------------------------------
     Step 3: CREATE BOUNDING BOX AND HEXGRID
@@ -48,6 +47,51 @@ fetch('https://raw.githubusercontent.com/zgy6677/472lab4/main/lab4/pedcyc_collis
 //      Use bounding box coordinates as argument in the turf hexgrid function
 
 
+        console.log(collisgeojson)    // check if fetch works
+
+        var bbox = turf.bbox(collisgeojson);
+        var bboxPolygon = turf.bboxPolygon(bbox);// create bounding box
+
+        // // adding boundingbox layer
+        // map.addSource('bbp', {
+        //     'type': 'geojson',
+        //     'data': bboxPolygon
+        // })
+
+        // map.addLayer({
+        //     'id': 'bpolygon',
+        //     'type': 'fill',
+        //     'source': 'bbp',
+        //     'paint':{
+        //         'fill-color': 'red',
+        //         'fill-opacity': 0.3
+        //     }
+        // });
+
+        // set up hex grid
+
+        var cellSide = 1;
+        var options = {units: 'kilometers'};
+        var hexgrid = turf.hexGrid(bbox, cellSide, options);
+
+        console.log(hexgrid) // debug use
+
+        // adding hexgrid layer
+        map.addSource('hex', {
+            'type': 'geojson',
+            'data': hexgrid
+        })
+
+        map.addLayer({
+            'id': 'hexgrid',
+            'type': 'fill',
+            'source': 'hex',
+            'paint':{
+                'fill-color': 'orange',
+                'fill-opacity': 0.3,
+                'fill-outline-color': 'red'
+            }
+        });
 
 /*--------------------------------------------------------------------
 Step 4: AGGREGATE COLLISIONS BY HEXGRID
@@ -55,6 +99,12 @@ Step 4: AGGREGATE COLLISIONS BY HEXGRID
 //HINT: Use Turf collect function to collect all '_id' properties from the collision points data for each heaxagon
 //      View the collect output in the console. Where there are no intersecting points in polygons, arrays will be empty
 
+        var pts = collisgeojson
+        var polys = hexgrid
+        var collected = turf.collect(polys, pts, '_id', 'values')
+        var values = collected.features[0].properties.values  // change feature index to show intected points
+        var numb = values.length
+        console.log(numb)
 
 
 // /*--------------------------------------------------------------------
@@ -66,5 +116,35 @@ Step 4: AGGREGATE COLLISIONS BY HEXGRID
 //        - The COUNT attribute
 //        - The maximum number of collisions found in a hexagon
 //      Add a legend and additional functionality including pop-up windows
+
+        // add pop-up window
+
+        map.on('click', 'hexgrid', (e) => {
+
+            var collected = turf.collect(e, pts, '_id', 'values')
+            var values = collected.features[0].properties.values  // change feature index to show intected points
+            var numb = values.length
+            console.log(numb)
+
+            new mapboxgl.Popup() 
+                .setLngLat(e.lngLat) 
+                .setHTML("<b>Collisions in Boundary: </b> " + numb + "<br>" )
+                .addTo(map); //Show popup on map
+        });
+
+
+        map.addLayer({  
+            'id': 'pedcyc-collis-pnts',
+            'type': 'circle',
+            'source': 'pedcyc-collis',
+            'paint': {
+                'circle-radius': 3,
+                'circle-color': 'blue'
+            }
+        });
+    });
+
+    // console.log(collisgeojson)    // check if fetch works debug use
+
 
 
